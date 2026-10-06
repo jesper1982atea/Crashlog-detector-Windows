@@ -1,0 +1,7 @@
+*.intunewin
+*.dmp
+*.log
+report.html
+report.json
+reporting.json
+*.tmp
