@@ -144,28 +144,31 @@ function Invoke-BoundedProcess {
         [Parameter(Mandatory)][string]$Arguments,
         [int]$TimeoutSeconds = 120
     )
-    $stdout = [IO.Path]::GetTempFileName()
-    $stderr = [IO.Path]::GetTempFileName()
-    $process = $null
+    $process = New-Object Diagnostics.Process
     try {
-        $process = Start-Process -FilePath $FilePath -ArgumentList $Arguments -PassThru -NoNewWindow `
-            -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+        $process.StartInfo.FileName = $FilePath
+        $process.StartInfo.Arguments = $Arguments
+        $process.StartInfo.UseShellExecute = $false
+        $process.StartInfo.CreateNoWindow = $true
+        $process.StartInfo.RedirectStandardOutput = $true
+        $process.StartInfo.RedirectStandardError = $true
+        [void]$process.Start()
+        $stdout = $process.StandardOutput.ReadToEndAsync()
+        $stderr = $process.StandardError.ReadToEndAsync()
         if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
             $process.Kill()
             $process.WaitForExit()
             throw "Timeout efter $TimeoutSeconds sekunder: $FilePath"
         }
         $process.WaitForExit()
-        $process.Refresh()
         [pscustomobject]@{
             ExitCode = $process.ExitCode
-            Output = [IO.File]::ReadAllText($stdout)
-            ErrorOutput = [IO.File]::ReadAllText($stderr)
+            Output = $stdout.GetAwaiter().GetResult()
+            ErrorOutput = $stderr.GetAwaiter().GetResult()
         }
     }
     finally {
-        if ($null -ne $process) { $process.Dispose() }
-        Remove-Item -LiteralPath $stdout, $stderr -Force
+        $process.Dispose()
     }
 }
 
